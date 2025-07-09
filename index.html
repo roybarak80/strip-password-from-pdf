@@ -1,19 +1,51 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="he">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>PDF Password Remover</title>
+    <title>מסיר סיסמאות PDF</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      .rtl {
+        direction: rtl;
+        text-align: right;
+      }
+      .rtl input,
+      .rtl table,
+      .rtl button {
+        direction: rtl;
+      }
+      .rtl th,
+      .rtl td {
+        text-align: right;
+      }
+    </style>
   </head>
   <body
     class="bg-gray-100 min-h-screen flex flex-col items-center justify-center p-4"
   >
-    <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-4xl">
-      <h1 class="text-2xl font-bold text-center mb-4">PDF Password Remover</h1>
+    <div
+      id="container"
+      class="bg-white rounded-lg shadow-lg p-6 w-full max-w-4xl rtl"
+    >
+      <div class="flex justify-between items-center mb-4">
+        <h1 id="title" class="text-2xl font-bold text-center">
+          מסיר סיסמאות PDF
+        </h1>
+        <button
+          id="languageToggle"
+          class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+        >
+          English
+        </button>
+      </div>
+
+      <!-- File Upload -->
       <div class="mb-4">
-        <label class="block text-sm font-medium text-gray-700 mb-2"
-          >Upload PDFs</label
+        <label
+          id="uploadLabel"
+          class="block text-sm font-medium text-gray-700 mb-2"
+          >העלאת קבצי PDF</label
         >
         <div
           class="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center"
@@ -29,94 +61,242 @@
             class="hidden"
             onchange="handleFileSelect(event)"
           />
-          <p class="text-gray-500">
-            Drag and drop PDFs here or click to select files
+          <p id="uploadText" class="text-gray-500">
+            גרור ושחרר קבצי PDF כאן או לחץ לבחירת קבצים
           </p>
         </div>
       </div>
+
+      <!-- Password List -->
       <div class="mb-4">
         <label
+          id="passwordListLabel"
           for="passwordList"
           class="block text-sm font-medium text-gray-700"
-          >Password List (comma-separated, optional)</label
+          >רשימת סיסמאות (מופרדות בפסיק, אופציונלי)</label
         >
         <input
           type="text"
           id="passwordList"
-          placeholder="e.g., pass1,pass2,pass3"
+          placeholder="לדוגמה, pass1,pass2,pass3"
           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
         />
       </div>
+
+      <!-- Default Password -->
       <div class="mb-4">
         <label
+          id="defaultPasswordLabel"
           for="defaultPassword"
           class="block text-sm font-medium text-gray-700"
-          >Default Password (optional)</label
+          >סיסמה ברירת מחדל (אופציונלי)</label
         >
         <input
           type="text"
           id="defaultPassword"
-          placeholder="Enter default password"
+          placeholder="הזן סיסמה ברירת מחדל"
           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
         />
       </div>
+
+      <!-- File List Table -->
       <div class="mb-4">
-        <h2 class="text-lg font-semibold mb-2">Selected Files</h2>
+        <h2 id="selectedFilesLabel" class="text-lg font-semibold mb-2">
+          קבצים שנבחרו
+        </h2>
         <table id="fileTable" class="w-full border-collapse">
           <thead>
             <tr class="bg-gray-200">
-              <th class="border p-2 text-left">File Name</th>
-              <th class="border p-2 text-left">Password</th>
-              <th class="border p-2 text-left">Status</th>
+              <th id="fileNameHeader" class="border p-2 text-right">
+                שם הקובץ
+              </th>
+              <th id="passwordHeader" class="border p-2 text-right">סיסמה</th>
+              <th id="statusHeader" class="border p-2 text-right">סטטוס</th>
             </tr>
           </thead>
           <tbody id="fileTableBody"></tbody>
         </table>
       </div>
+
+      <!-- Process Button -->
       <button
         id="processButton"
         class="w-full bg-indigo-600 text-white py-2 rounded-md hover:bg-indigo-700 disabled:bg-gray-400"
         disabled
       >
-        Process PDFs
+        עבד קבצי PDF
       </button>
+
+      <!-- Results -->
       <div id="results" class="mt-4 hidden">
-        <h2 class="text-lg font-semibold mb-2">Results</h2>
+        <h2 id="resultsLabel" class="text-lg font-semibold mb-2">תוצאות</h2>
         <table class="w-full border-collapse">
           <thead>
             <tr class="bg-gray-200">
-              <th class="border p-2 text-left">File Name</th>
-              <th class="border p-2 text-left">Actions</th>
+              <th id="resultFileNameHeader" class="border p-2 text-right">
+                שם הקובץ
+              </th>
+              <th id="actionsHeader" class="border p-2 text-right">פעולות</th>
             </tr>
           </thead>
           <tbody id="downloadList"></tbody>
         </table>
       </div>
     </div>
+
     <script>
       let files = [];
+      let isHebrew = localStorage.getItem("language") !== "en"; // Default to Hebrew
+
+      const translations = {
+        en: {
+          title: "PDF Password Remover",
+          uploadLabel: "Upload PDFs",
+          uploadText: "Drag and drop PDFs here or click to select files",
+          passwordListLabel: "Password List (comma-separated, optional)",
+          passwordListPlaceholder: "e.g., pass1,pass2,pass3",
+          defaultPasswordLabel: "Default Password (optional)",
+          defaultPasswordPlaceholder: "Enter default password",
+          selectedFilesLabel: "Selected Files",
+          fileNameHeader: "File Name",
+          passwordHeader: "Password",
+          statusHeader: "Status",
+          processButton: "Process PDFs",
+          resultsLabel: "Results",
+          resultFileNameHeader: "File Name",
+          actionsHeader: "Actions",
+          viewAction: "View",
+          downloadAction: "Download",
+          pngAction: "Save as PNG",
+          toggleButton: "עברית",
+        },
+        he: {
+          title: "מסיר סיסמאות PDF",
+          uploadLabel: "העלאת קבצי PDF",
+          uploadText: "גרור ושחרר קבצי PDF כאן או לחץ לבחירת קבצים",
+          passwordListLabel: "רשימת סיסמאות (מופרדות בפסיק, אופציונלי)",
+          passwordListPlaceholder: "לדוגמה, pass1,pass2,pass3",
+          defaultPasswordLabel: "סיסמה ברירת מחדל (אופציונלי)",
+          defaultPasswordPlaceholder: "הזן סיסמה ברירת מחדל",
+          selectedFilesLabel: "קבצים שנבחרו",
+          fileNameHeader: "שם הקובץ",
+          passwordHeader: "סיסמה",
+          statusHeader: "סטטוס",
+          processButton: "עבד קבצי PDF",
+          resultsLabel: "תוצאות",
+          resultFileNameHeader: "שם הקובץ",
+          actionsHeader: "פעולות",
+          viewAction: "צפה",
+          downloadAction: "הורד",
+          pngAction: "שמור כ-PNG",
+          toggleButton: "English",
+        },
+      };
+
+      function updateLanguage() {
+        const lang = isHebrew ? "he" : "en";
+        document.documentElement.lang = lang;
+        document.getElementById("container").classList.toggle("rtl", isHebrew);
+        document.getElementById("title").textContent = translations[lang].title;
+        document.getElementById("uploadLabel").textContent =
+          translations[lang].uploadLabel;
+        document.getElementById("uploadText").textContent =
+          translations[lang].uploadText;
+        document.getElementById("passwordListLabel").textContent =
+          translations[lang].passwordListLabel;
+        document.getElementById("passwordList").placeholder =
+          translations[lang].passwordListPlaceholder;
+        document.getElementById("defaultPasswordLabel").textContent =
+          translations[lang].defaultPasswordLabel;
+        document.getElementById("defaultPassword").placeholder =
+          translations[lang].defaultPasswordPlaceholder;
+        document.getElementById("selectedFilesLabel").textContent =
+          translations[lang].selectedFilesLabel;
+        document.getElementById("fileNameHeader").textContent =
+          translations[lang].fileNameHeader;
+        document.getElementById("passwordHeader").textContent =
+          translations[lang].passwordHeader;
+        document.getElementById("statusHeader").textContent =
+          translations[lang].statusHeader;
+        document.getElementById("processButton").textContent =
+          translations[lang].processButton;
+        document.getElementById("resultsLabel").textContent =
+          translations[lang].resultsLabel;
+        document.getElementById("resultFileNameHeader").textContent =
+          translations[lang].resultFileNameHeader;
+        document.getElementById("actionsHeader").textContent =
+          translations[lang].actionsHeader;
+        document.getElementById("languageToggle").textContent =
+          translations[lang].toggleButton;
+        // Update table rows dynamically
+        const statusCells = document.querySelectorAll('[id^="status-"]');
+        statusCells.forEach((cell) => {
+          if (
+            cell.textContent ===
+              translations[isHebrew ? "en" : "he"].statusHeader ||
+            cell.textContent === "Pending" ||
+            cell.textContent === "סטטוס"
+          ) {
+            cell.textContent = translations[lang].statusHeader;
+          } else if (
+            cell.textContent === "Success" ||
+            cell.textContent === "הצלחה"
+          ) {
+            cell.textContent =
+              translations[lang].statusHeader === "Status"
+                ? "Success"
+                : "הצלחה";
+          } else if (
+            cell.textContent.startsWith("Failed") ||
+            cell.textContent.startsWith("נכשל")
+          ) {
+            const error = cell.textContent.split(": ")[1];
+            cell.textContent = `${
+              translations[lang].statusHeader === "Status" ? "Failed" : "נכשל"
+            }: ${error}`;
+          }
+        });
+      }
+
+      function toggleLanguage() {
+        isHebrew = !isHebrew;
+        localStorage.setItem("language", isHebrew ? "he" : "en");
+        updateLanguage();
+      }
+
+      // Initialize language
+      updateLanguage();
+      document
+        .getElementById("languageToggle")
+        .addEventListener("click", toggleLanguage);
+
       function handleDragOver(event) {
         event.preventDefault();
         event.target.classList.add("border-indigo-500");
       }
+
       function handleDragLeave(event) {
         event.target.classList.remove("border-indigo-500");
       }
+
       function handleDrop(event) {
         event.preventDefault();
         event.target.classList.remove("border-indigo-500");
         const droppedFiles = event.dataTransfer.files;
         handleFiles(droppedFiles);
       }
+
       function handleFileSelect(event) {
         handleFiles(event.target.files);
       }
+
       function handleFiles(selectedFiles) {
         files = [...selectedFiles].filter(
           (file) => file.type === "application/pdf"
         );
         updateFileTable();
       }
+
       function updateFileTable() {
         const tbody = document.getElementById("fileTableBody");
         tbody.innerHTML = "";
@@ -125,15 +305,20 @@
           row.innerHTML = `
                     <td class="border p-2">${file.name}</td>
                     <td class="border p-2">
-                        <input type="text" class="w-full border rounded p-1" placeholder="Enter password"
+                        <input type="text" class="w-full border rounded p-1" placeholder="${
+                          translations[isHebrew ? "he" : "en"].passwordHeader
+                        }"
                                data-index="${index}">
                     </td>
-                    <td class="border p-2 text-gray-500" id="status-${index}">Pending</td>
+                    <td class="border p-2 text-gray-500" id="status-${index}">${
+            translations[isHebrew ? "he" : "en"].statusHeader
+          }</td>
                 `;
           tbody.appendChild(row);
         });
         document.getElementById("processButton").disabled = files.length === 0;
       }
+
       document
         .getElementById("processButton")
         .addEventListener("click", async () => {
@@ -154,44 +339,67 @@
             formData.append("passwords", password || "");
           });
           formData.append("passwordList", JSON.stringify(passwordList));
+
           document.getElementById("processButton").disabled = true;
           const resultsDiv = document.getElementById("results");
           const downloadList = document.getElementById("downloadList");
           resultsDiv.classList.remove("hidden");
           downloadList.innerHTML = "";
+
           try {
             const response = await fetch("/process", {
               method: "POST",
               body: formData,
             });
             const result = await response.json();
+
             result.results.forEach((res, index) => {
               const statusCell = document.getElementById(`status-${index}`);
               statusCell.textContent = res.success
-                ? "Success"
+                ? isHebrew
+                  ? "הצלחה"
+                  : "Success"
                 : `Failed: ${res.error}`;
               statusCell.className = `border p-2 ${
                 res.success ? "text-green-600" : "text-red-600"
               }`;
+
               if (res.success) {
                 const row = document.createElement("tr");
                 row.innerHTML = `
                             <td class="border p-2">${res.output}</td>
                             <td class="border p-2">
-                                <a href="/view/${res.output}" target="_blank" class="text-blue-600 underline mr-4">View</a>
-                                <a href="/download/${res.output}" class="text-blue-600 underline mr-4" download>Download</a>
-                                <a href="/png/${res.output}" class="text-blue-600 underline" download>Save as PNG</a>
+                                <a href="/view/${
+                                  res.output
+                                }" target="_blank" class="text-blue-600 underline mr-4">${
+                  translations[isHebrew ? "he" : "en"].viewAction
+                }</a>
+                                <a href="/download/${
+                                  res.output
+                                }" class="text-blue-600 underline mr-4" download>${
+                  translations[isHebrew ? "he" : "en"].downloadAction
+                }</a>
+                                <a href="/png/${
+                                  res.output
+                                }" class="text-blue-600 underline" download>${
+                  translations[isHebrew ? "he" : "en"].pngAction
+                }</a>
                             </td>
                         `;
                 downloadList.appendChild(row);
               }
             });
           } catch (error) {
-            alert("Error processing files: " + error.message);
+            alert(
+              isHebrew
+                ? `שגיאה בעיבוד קבצים: ${error.message}`
+                : `Error processing files: ${error.message}`
+            );
           } finally {
             document.getElementById("processButton").disabled = false;
           }
         });
+
       document.querySelector(".border-dashed").addEventListener("click", () => {
         document.getElementById("pdfFiles").click();
       });
