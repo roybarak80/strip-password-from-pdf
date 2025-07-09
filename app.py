@@ -142,7 +142,7 @@ def convert_to_png(filename):
 if __name__ == "__main__":
     try:
         print("Starting Flask app...")
-        port = int(os.getenv('PORT', 5001))  # Changed to 5001
+        port = int(os.getenv('PORT', 8000))  # Use 8000 for Docker
         app.run(debug=False, host='0.0.0.0', port=port)
     except Exception as e:
         print(f"Failed to start Flask app: {str(e)}")
