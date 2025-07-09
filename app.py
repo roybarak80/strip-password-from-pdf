@@ -6,6 +6,7 @@ import shutil
 from datetime import datetime
 import json
 import zipfile
+from pdf2image import convert_from_path
 
 app = Flask(__name__)
 
@@ -13,11 +14,11 @@ app = Flask(__name__)
 logging.basicConfig(filename='pdf_password_removal.log', level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Define directories
-INPUT_DIR = "/Users/roybarak/Projects/strip-pass-pdf/downloads"
-OUTPUT_DIR = "/Users/roybarak/Projects/strip-pass-pdf/stripped"
-TEMP_DIR = "/Users/roybarak/Projects/strip-pass-pdf/temp"
-TEMP_PNG_DIR = "/Users/roybarak/Projects/strip-pass-pdf/temp_png"
+# Define directories (relative paths for Render compatibility)
+INPUT_DIR = os.path.join(os.path.dirname(__file__), "downloads")
+OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "stripped")
+TEMP_DIR = os.path.join(os.path.dirname(__file__), "temp")
+TEMP_PNG_DIR = os.path.join(os.path.dirname(__file__), "temp_png")
 
 # Ensure directories exist
 for dir_path in [INPUT_DIR, OUTPUT_DIR, TEMP_DIR, TEMP_PNG_DIR]:
@@ -107,7 +108,6 @@ def download_file(filename):
 @app.route('/png/<filename>')
 def convert_to_png(filename):
     try:
-        from pdf2pic import pdf2pic
         file_path = os.path.join(OUTPUT_DIR, filename)
         logging.info(f"Converting to PNG: {file_path}")
         if not os.path.exists(file_path):
@@ -118,9 +118,10 @@ def convert_to_png(filename):
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
         output_base = os.path.join(output_dir, f"{filename}_page")
-        pdf2pic.convert(file_path, output_dir=output_dir, output_file=output_base, format='png')
-        # Check for generated PNGs
-        png_files = [f for f in os.listdir(output_dir) if f.startswith(f"{filename}_page") and f.endswith('.png')]
+        # Convert all pages to PNG
+        images = convert_from_path(file_path, dpi=100, output_folder=output_dir, output_file=filename, fmt='png')
+        # Collect generated PNGs
+        png_files = [f for f in os.listdir(output_dir) if f.startswith(filename) and f.endswith('.png')]
         if not png_files:
             logging.error(f"No PNGs generated for {filename}")
             return "Error: No PNGs generated", 500
@@ -141,7 +142,7 @@ def convert_to_png(filename):
 if __name__ == "__main__":
     try:
         print("Starting Flask app...")
-        port = int(os.getenv('PORT', 5000))
+        port = int(os.getenv('PORT', 5001))  # Changed to 5001
         app.run(debug=False, host='0.0.0.0', port=port)
     except Exception as e:
         print(f"Failed to start Flask app: {str(e)}")
