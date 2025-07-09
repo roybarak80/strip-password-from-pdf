@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PDF Password Remover</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
+  <body
+    class="bg-gray-100 min-h-screen flex flex-col items-center justify-center p-4"
+  >
+    <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-4xl">
+      <h1 class="text-2xl font-bold text-center mb-4">PDF Password Remover</h1>
+      <div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-2"
+          >Upload PDFs</label
+        >
+        <div
+          class="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center"
+          ondrop="handleDrop(event)"
+          ondragover="handleDragOver(event)"
+          ondragleave="handleDragLeave(event)"
+        >
+          <input
+            type="file"
+            id="pdfFiles"
+            multiple
+            accept=".pdf"
+            class="hidden"
+            onchange="handleFileSelect(event)"
+          />
+          <p class="text-gray-500">
+            Drag and drop PDFs here or click to select files
+          </p>
+        </div>
+      </div>
+      <div class="mb-4">
+        <label
+          for="passwordList"
+          class="block text-sm font-medium text-gray-700"
+          >Password List (comma-separated, optional)</label
+        >
+        <input
+          type="text"
+          id="passwordList"
+          placeholder="e.g., pass1,pass2,pass3"
+          class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+        />
+      </div>
+      <div class="mb-4">
+        <label
+          for="defaultPassword"
+          class="block text-sm font-medium text-gray-700"
+          >Default Password (optional)</label
+        >
+        <input
+          type="text"
+          id="defaultPassword"
+          placeholder="Enter default password"
+          class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+        />
+      </div>
+      <div class="mb-4">
+        <h2 class="text-lg font-semibold mb-2">Selected Files</h2>
+        <table id="fileTable" class="w-full border-collapse">
+          <thead>
+            <tr class="bg-gray-200">
+              <th class="border p-2 text-left">File Name</th>
+              <th class="border p-2 text-left">Password</th>
+              <th class="border p-2 text-left">Status</th>
+            </tr>
+          </thead>
+          <tbody id="fileTableBody"></tbody>
+        </table>
+      </div>
+      <button
+        id="processButton"
+        class="w-full bg-indigo-600 text-white py-2 rounded-md hover:bg-indigo-700 disabled:bg-gray-400"
+        disabled
+      >
+        Process PDFs
+      </button>
+      <div id="results" class="mt-4 hidden">
+        <h2 class="text-lg font-semibold mb-2">Results</h2>
+        <table class="w-full border-collapse">
+          <thead>
+            <tr class="bg-gray-200">
+              <th class="border p-2 text-left">File Name</th>
+              <th class="border p-2 text-left">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="downloadList"></tbody>
+        </table>
+      </div>
+    </div>
+    <script>
+      let files = [];
+      function handleDragOver(event) {
+        event.preventDefault();
+        event.target.classList.add("border-indigo-500");
+      }
+      function handleDragLeave(event) {
+        event.target.classList.remove("border-indigo-500");
+      }
+      function handleDrop(event) {
+        event.preventDefault();
+        event.target.classList.remove("border-indigo-500");
+        const droppedFiles = event.dataTransfer.files;
+        handleFiles(droppedFiles);
+      }
+      function handleFileSelect(event) {
+        handleFiles(event.target.files);
+      }
+      function handleFiles(selectedFiles) {
+        files = [...selectedFiles].filter(
+          (file) => file.type === "application/pdf"
+        );
+        updateFileTable();
+      }
+      function updateFileTable() {
+        const tbody = document.getElementById("fileTableBody");
+        tbody.innerHTML = "";
+        files.forEach((file, index) => {
+          const row = document.createElement("tr");
+          row.innerHTML = `
+                    <td class="border p-2">${file.name}</td>
+                    <td class="border p-2">
+                        <input type="text" class="w-full border rounded p-1" placeholder="Enter password"
+                               data-index="${index}">
+                    </td>
+                    <td class="border p-2 text-gray-500" id="status-${index}">Pending</td>
+                `;
+          tbody.appendChild(row);
+        });
+        document.getElementById("processButton").disabled = files.length === 0;
+      }
+      document
+        .getElementById("processButton")
+        .addEventListener("click", async () => {
+          const defaultPassword =
+            document.getElementById("defaultPassword").value;
+          const passwordList = document
+            .getElementById("passwordList")
+            .value.split(",")
+            .map((p) => p.trim())
+            .filter((p) => p);
+          const formData = new FormData();
+          files.forEach((file, index) => {
+            formData.append("files", file);
+            const passwordInput = document.querySelector(
+              `input[data-index="${index}"]`
+            );
+            const password = passwordInput.value || defaultPassword;
+            formData.append("passwords", password || "");
+          });
+          formData.append("passwordList", JSON.stringify(passwordList));
+          document.getElementById("processButton").disabled = true;
+          const resultsDiv = document.getElementById("results");
+          const downloadList = document.getElementById("downloadList");
+          resultsDiv.classList.remove("hidden");
+          downloadList.innerHTML = "";
+          try {
+            const response = await fetch("/process", {
+              method: "POST",
+              body: formData,
+            });
+            const result = await response.json();
+            result.results.forEach((res, index) => {
+              const statusCell = document.getElementById(`status-${index}`);
+              statusCell.textContent = res.success
+                ? "Success"
+                : `Failed: ${res.error}`;
+              statusCell.className = `border p-2 ${
+                res.success ? "text-green-600" : "text-red-600"
+              }`;
+              if (res.success) {
+                const row = document.createElement("tr");
+                row.innerHTML = `
+                            <td class="border p-2">${res.output}</td>
+                            <td class="border p-2">
+                                <a href="/view/${res.output}" target="_blank" class="text-blue-600 underline mr-4">View</a>
+                                <a href="/download/${res.output}" class="text-blue-600 underline mr-4" download>Download</a>
+                                <a href="/png/${res.output}" class="text-blue-600 underline" download>Save as PNG</a>
+                            </td>
+                        `;
+                downloadList.appendChild(row);
+              }
+            });
+          } catch (error) {
+            alert("Error processing files: " + error.message);
+          } finally {
+            document.getElementById("processButton").disabled = false;
+          }
+        });
+      document.querySelector(".border-dashed").addEventListener("click", () => {
+        document.getElementById("pdfFiles").click();
+      });
+    </script>
+  </body>
+</html>
